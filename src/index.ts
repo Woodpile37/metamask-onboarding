@@ -1,46 +1,33 @@
-import Bowser from 'bowser';
-
-const PLATFORM = {
-  DESKTOP: 'DESKTOP' as const,
-  MOBILE: 'MOBILE' as const,
-};
+import Bowser from "bowser";
 
 const ONBOARDING_STATE = {
-  INSTALLED: 'INSTALLED' as const,
-  NOT_INSTALLED: 'NOT_INSTALLED' as const,
-  REGISTERED: 'REGISTERED' as const,
-  REGISTERING: 'REGISTERING' as const,
-  RELOADING: 'RELOADING' as const,
+  INSTALLED: "INSTALLED" as const,
+  NOT_INSTALLED: "NOT_INSTALLED" as const,
+  REGISTERED: "REGISTERED" as const,
+  REGISTERING: "REGISTERING" as const,
+  RELOADING: "RELOADING" as const,
 };
 
-const METAMASK_DOWNLOAD_URL = {
-  DESKTOP: {
-    CHROME:
-      'https://chrome.google.com/webstore/detail/metamask/nkbihfbeogaeaoehlefnkodbefgpgknn',
-    FIREFOX: 'https://addons.mozilla.org/firefox/addon/ether-metamask/',
-    DEFAULT: 'https://metamask.io',
-  },
-  MOBILE: {
-    IOS: 'https://apps.apple.com/us/app/metamask-blockchain-wallet/id1438144202',
-    ANDROID: 'market://details?id=io.metamask',
-  },
+const EXTENSION_DOWNLOAD_URL = {
+  CHROME:
+    "https://chrome.google.com/webstore/detail/metamask/nkbihfbeogaeaoehlefnkodbefgpgknn",
+  FIREFOX: "https://addons.mozilla.org/firefox/addon/ether-metamask/",
+  DEFAULT: "https://metamask.io",
 };
 
 // sessionStorage key
-const REGISTRATION_IN_PROGRESS = 'REGISTRATION_IN_PROGRESS';
+const REGISTRATION_IN_PROGRESS = "REGISTRATION_IN_PROGRESS";
 
 // forwarder iframe id
-const FORWARDER_ID = 'FORWARDER_ID';
+const FORWARDER_ID = "FORWARDER_ID";
 
 export default class Onboarding {
   static FORWARDER_MODE = {
-    INJECT: 'INJECT' as const,
-    OPEN_TAB: 'OPEN_TAB' as const,
+    INJECT: "INJECT" as const,
+    OPEN_TAB: "OPEN_TAB" as const,
   };
 
   private readonly forwarderOrigin: string;
-
-  private readonly isPlatformDesktop: boolean;
 
   private readonly downloadUrl: string;
 
@@ -49,7 +36,7 @@ export default class Onboarding {
   private state: keyof typeof ONBOARDING_STATE;
 
   constructor({
-    forwarderOrigin = 'https://fwd.metamask.io',
+    forwarderOrigin = "https://fwd.metamask.io",
     forwarderMode = Onboarding.FORWARDER_MODE.INJECT,
   } = {}) {
     this.forwarderOrigin = forwarderOrigin;
@@ -58,8 +45,12 @@ export default class Onboarding {
       ? ONBOARDING_STATE.INSTALLED
       : ONBOARDING_STATE.NOT_INSTALLED;
 
-    this.isPlatformDesktop = Onboarding._detectPlatform() === PLATFORM.DESKTOP;
-    this.downloadUrl = this._getDownloadUrl();
+    const browser = Onboarding._detectBrowser();
+    if (browser) {
+      this.downloadUrl = EXTENSION_DOWNLOAD_URL[browser];
+    } else {
+      this.downloadUrl = EXTENSION_DOWNLOAD_URL.DEFAULT;
+    }
 
     this._onMessage = this._onMessage.bind(this);
     this._onMessageFromForwarder = this._onMessageFromForwarder.bind(this);
@@ -68,11 +59,11 @@ export default class Onboarding {
     this.startOnboarding = this.startOnboarding.bind(this);
     this.stopOnboarding = this.stopOnboarding.bind(this);
 
-    window.addEventListener('message', this._onMessage);
+    window.addEventListener("message", this._onMessage);
 
     if (
       forwarderMode === Onboarding.FORWARDER_MODE.INJECT &&
-      sessionStorage.getItem(REGISTRATION_IN_PROGRESS) === 'true'
+      sessionStorage.getItem(REGISTRATION_IN_PROGRESS) === "true"
     ) {
       Onboarding._injectForwarder(this.forwarderOrigin);
     }
@@ -84,11 +75,10 @@ export default class Onboarding {
       return undefined;
     }
 
-    if (event.data.type === 'metamask:reload') {
+    if (event.data.type === "metamask:reload") {
       return this._onMessageFromForwarder(event);
     }
 
-    
     return undefined;
   }
 
@@ -99,30 +89,35 @@ export default class Onboarding {
   async _onMessageFromForwarder(event: MessageEvent) {
     switch (this.state) {
       case ONBOARDING_STATE.RELOADING:
-        {}
+        {
+        }
         break;
       case ONBOARDING_STATE.NOT_INSTALLED:
-        {}
+        {
+        }
         this.state = ONBOARDING_STATE.RELOADING;
         location.reload();
         break;
 
       case ONBOARDING_STATE.INSTALLED:
-        {}
+        {
+        }
         this.state = ONBOARDING_STATE.REGISTERING;
         await Onboarding._register();
         this.state = ONBOARDING_STATE.REGISTERED;
         (event.source as Window).postMessage(
-          { type: 'metamask:registrationCompleted' },
-          event.origin,
+          { type: "metamask:registrationCompleted" },
+          event.origin
         );
         this.stopOnboarding();
         break;
       case ONBOARDING_STATE.REGISTERING:
-        {}
+        {
+        }
         break;
       case ONBOARDING_STATE.REGISTERED:
-        {}
+        {
+        }
         break;
       default:
         this._onMessageUnknownStateError(this.state);
@@ -133,7 +128,7 @@ export default class Onboarding {
    * Starts onboarding by opening the MetaMask download page and the Onboarding forwarder
    */
   startOnboarding() {
-    sessionStorage.setItem(REGISTRATION_IN_PROGRESS, 'true');
+    sessionStorage.setItem(REGISTRATION_IN_PROGRESS, "true");
     this._openDownloadPage();
     this._openForwarder();
   }
@@ -145,46 +140,24 @@ export default class Onboarding {
    * onboarding completes before the forwarder has registered.
    */
   stopOnboarding() {
-    if (sessionStorage.getItem(REGISTRATION_IN_PROGRESS) === 'true') {
+    if (sessionStorage.getItem(REGISTRATION_IN_PROGRESS) === "true") {
       if (this.forwarderMode === Onboarding.FORWARDER_MODE.INJECT) {
-        
         Onboarding._removeForwarder();
       }
-      sessionStorage.setItem(REGISTRATION_IN_PROGRESS, 'false');
+      sessionStorage.setItem(REGISTRATION_IN_PROGRESS, "false");
     }
   }
 
   _openForwarder() {
     if (this.forwarderMode === Onboarding.FORWARDER_MODE.OPEN_TAB) {
-      window.open(this.forwarderOrigin, '_blank');
+      window.open(this.forwarderOrigin, "_blank");
     } else {
       Onboarding._injectForwarder(this.forwarderOrigin);
     }
   }
 
   _openDownloadPage() {
-    window.open(this.downloadUrl, '_blank');
-  }
-
-  _getDownloadUrl() {
-    const browserInfo = Bowser.parse(window.navigator.userAgent);
-    const browserName = browserInfo.browser.name;
-
-    if (this.isPlatformDesktop) {
-      if (browserName === 'Firefox') {
-        return METAMASK_DOWNLOAD_URL.DESKTOP.FIREFOX;
-      } else if (['Chrome', 'Chromium'].includes(browserName || '')) {
-        return METAMASK_DOWNLOAD_URL.DESKTOP.CHROME;
-      }
-
-      return METAMASK_DOWNLOAD_URL.DESKTOP.DEFAULT;
-    }
-
-    const isIOS = browserInfo.platform.vendor === 'Apple';
-    if (isIOS) {
-      return METAMASK_DOWNLOAD_URL.MOBILE.IOS;
-    }
-    return METAMASK_DOWNLOAD_URL.MOBILE.ANDROID;
+    window.open(this.downloadUrl, "_blank");
   }
 
   /**
@@ -192,24 +165,24 @@ export default class Onboarding {
    */
   static isMetaMaskInstalled() {
     return Boolean(
-      (window as any).ethereum && (window as any).ethereum.isMetaMask,
+      (window as any).ethereum && (window as any).ethereum.isMetaMask
     );
   }
 
   static _register() {
     return (window as any).ethereum.request({
-      method: 'wallet_registerOnboarding',
+      method: "wallet_registerOnboarding",
     });
   }
 
   static _injectForwarder(forwarderOrigin: string) {
     const container = document.body;
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('height', '0');
-    iframe.setAttribute('width', '0');
-    iframe.setAttribute('style', 'display: none;');
-    iframe.setAttribute('src', forwarderOrigin);
-    iframe.setAttribute('id', FORWARDER_ID);
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("height", "0");
+    iframe.setAttribute("width", "0");
+    iframe.setAttribute("style", "display: none;");
+    iframe.setAttribute("src", forwarderOrigin);
+    iframe.setAttribute("id", FORWARDER_ID);
     container.insertBefore(iframe, container.children[0]);
   }
 
@@ -217,13 +190,15 @@ export default class Onboarding {
     document.getElementById(FORWARDER_ID)?.remove();
   }
 
-  static _detectPlatform() {
+  static _detectBrowser() {
     const browserInfo = Bowser.parse(window.navigator.userAgent);
-    const isPlatformDesktop = browserInfo.platform.type === 'desktop';
-
-    if (isPlatformDesktop) {
-      return PLATFORM.DESKTOP;
+    if (browserInfo.browser.name === "Firefox") {
+      return "FIREFOX";
+    } else if (
+      ["Chrome", "Chromium"].includes(browserInfo.browser.name || "")
+    ) {
+      return "CHROME";
     }
-    return PLATFORM.MOBILE;
+    return null;
   }
 }
